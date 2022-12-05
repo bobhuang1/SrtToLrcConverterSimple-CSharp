@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SrtToLrcConverterSimple": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\Users\\Bob\\Videos\\IELTS1000"
+    }
+  }
+}
