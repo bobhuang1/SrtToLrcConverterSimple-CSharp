@@ -1,164 +1,175 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using File = System.IO.File;
 using System;
-using System.Security.Cryptography;
 
 namespace SrtToLrcConverterSimple;
 
+/// <summary>
+/// Batch-converts .srt subtitle files to .lrc lyric files (the format used by many music
+/// players for synchronized lyrics), recursively through a given directory.
+/// </summary>
 class SrtToLrcConverterSimple
 {
-    private static readonly string InputFileExtension = "SRT";
-    private static readonly string OutputFileExtenstion = "LRC";
+    private const string InputFileExtension = ".srt";
+    private const string OutputFileExtension = ".lrc";
     private static readonly Encoding DefaultEncoding = Encoding.UTF8;
-    private static readonly string[] RemoveText = { "_中文（自动翻译）", "_中文（自动生成）", "（自动生成）" };
+
+    // Known filename suffixes (e.g. from auto-generated/auto-translated caption exports) to
+    // strip from the output filename. Edit this list for your own naming convention.
+    private static readonly string[] KnownFilenameSuffixesToStrip =
+    {
+        "_中文（自动翻译）", "_中文（自动生成）", "（自动生成）"
+    };
+
+    private static readonly Regex HtmlTagPattern = new(
+        "<\\S[^><]*>",
+        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public class SubTitle
     {
         public int Sequence { get; set; }
-
         public TimeSpan From { get; set; }
-
         public TimeSpan To { get; set; }
-
         public string? Text { get; set; }
     }
-
 
     private static int Main(string[] args)
     {
         if (args.Length == 0)
         {
-            // No parameter found
-            Console.WriteLine("Usage: Add path of SRT files as input parameter");
-            return 0;
+            Console.WriteLine("Usage: SrtToLrcConverterSimple <path to folder containing .srt files>");
+            return 1;
         }
 
         var pathToSrtFiles = CleanText(args[0]);
-        if (string.IsNullOrEmpty(pathToSrtFiles))
-        {
-            // Wrong parameter found
-            Console.WriteLine("Usage: Add path of SRT files as input parameter");
-            return -1;
-        }
-
-        // Take a snapshot of the file system.  
         var dir = new DirectoryInfo(pathToSrtFiles);
 
-        if (dir is null)
+        if (string.IsNullOrEmpty(pathToSrtFiles) || !dir.Exists)
         {
-            // Wrong parameter found
-            Console.WriteLine("Input directory does not exist");
-            return -1;
+            Console.WriteLine($"Input directory does not exist: \"{pathToSrtFiles}\"");
+            return 1;
         }
 
-        Console.WriteLine($"Input directory: {pathToSrtFiles}, list of SRT files: ");
-        // This method assumes that the application has discovery permissions  
-        // for all folders under the specified path.  
+        Console.WriteLine($"Input directory: {pathToSrtFiles}");
+
+        // Assumes discovery permissions for all folders under the specified path.
         var fileList = dir.GetFiles("*" + InputFileExtension, SearchOption.AllDirectories);
-        //Create the query  
+        var convertedCount = 0;
+
         foreach (var file in fileList)
         {
-            var lrcFileContent = ParseSrtToLrc(file.FullName, DefaultEncoding);
-            if (string.IsNullOrEmpty(lrcFileContent))
+            try
             {
-                Console.WriteLine("Unable to parse SRT into LRC. Skipped.");
-                continue;
-            }
-            var lrcFileName = string.Concat(file.FullName.AsSpan(0, file.FullName.Length - 3), OutputFileExtenstion);
-            foreach (var remove in RemoveText)
-            {
-                lrcFileName = lrcFileName.Replace(remove, string.Empty);
-            }
-            Console.WriteLine(lrcFileName);
-            // Console.WriteLine(lrcFileContent);
-            WriteLrcFile(lrcFileName, lrcFileContent, DefaultEncoding);
+                var lrcFileContent = ParseSrtToLrc(file.FullName, DefaultEncoding);
+                if (string.IsNullOrEmpty(lrcFileContent))
+                {
+                    Console.WriteLine($"  {file.Name}: no subtitles parsed, skipped.");
+                    continue;
+                }
 
+                var outputName = file.Name;
+                foreach (var suffix in KnownFilenameSuffixesToStrip)
+                    outputName = outputName.Replace(suffix, string.Empty);
+
+                var lrcFilePath = Path.Combine(
+                    file.DirectoryName ?? string.Empty,
+                    Path.ChangeExtension(outputName, OutputFileExtension));
+
+                WriteLrcFile(lrcFilePath, lrcFileContent, DefaultEncoding);
+                Console.WriteLine($"  {file.Name} -> {Path.GetFileName(lrcFilePath)}");
+                convertedCount++;
+            }
+            catch (Exception ex)
+            {
+                // Don't let one bad file abort the whole batch.
+                Console.WriteLine($"  {file.Name}: failed to convert - {ex.Message}");
+            }
         }
-        return 1;
+
+        Console.WriteLine($"Done. Converted {convertedCount} of {fileList.Length} file(s).");
+        return 0;
     }
 
     private static string ParseSrtToLrc(string fileFullName, Encoding encoding)
     {
-        Console.WriteLine($"Input File Name: {fileFullName}");
         using StreamReader sr = new(fileFullName, encoding);
         var subTitles = new List<SubTitle>();
+
         while (sr.Peek() >= 0)
         {
-            string? text = sr.ReadLine();
-            while (string.IsNullOrEmpty(text))
-            {
-                text = sr.ReadLine();
-            }
+            var text = ReadNextNonEmptyLine(sr);
+            if (text is null) break; // reached end of file while skipping blank lines
 
-            if (string.IsNullOrEmpty(text))
+            if (!int.TryParse(text, out var sequence))
             {
+                Console.WriteLine($"    Could not parse line, expecting a sequence number: {text}");
                 continue;
             }
-            if (int.TryParse(text, out var result))
-            {
-                var subTitle = new SubTitle
-                {
-                    Sequence = result
-                };
-                text = sr.ReadLine();
-                string[]? array = text?.Split(new[] { "-->" }, StringSplitOptions.RemoveEmptyEntries);
-                if (array?.Length == 2)
-                {
-                    string input = array[0].Trim();
-                    string input2 = array[1].Trim();
-                    if (TimeSpan.TryParseExact(input, "hh\\:mm\\:ss\\,fff", CultureInfo.CurrentCulture, out var result2) && TimeSpan.TryParseExact(input2, "hh\\:mm\\:ss\\,fff", CultureInfo.CurrentCulture, out var result3))
-                    {
-                        subTitle.From = result2;
-                        subTitle.To = result3;
-                        subTitle.Text = string.Empty;
-                        while (!sr.EndOfStream)
-                        {
-                            text = sr.ReadLine();
-                            if (string.IsNullOrEmpty(text))
-                            {
-                                break;
-                            }
 
-                            subTitle.Text += CleanHtmlTags(text) + " ";
-                        }
-                        subTitles.Add(subTitle);
-                        continue;
-                    }
-                    Console.WriteLine($"Could not parse line, expecting from and to timestamps: {text}");
-                }
-                Console.WriteLine($"Could not parse line, expecting from and to timestamps: {text}");
+            var subTitle = new SubTitle { Sequence = sequence };
+            var timingLine = sr.ReadLine();
+            var timingParts = timingLine?.Split(new[] { "-->" }, StringSplitOptions.RemoveEmptyEntries);
+
+            if (timingParts?.Length != 2 ||
+                !TimeSpan.TryParseExact(timingParts[0].Trim(), "hh\\:mm\\:ss\\,fff", CultureInfo.InvariantCulture, out var from) ||
+                !TimeSpan.TryParseExact(timingParts[1].Trim(), "hh\\:mm\\:ss\\,fff", CultureInfo.InvariantCulture, out var to))
+            {
+                Console.WriteLine($"    Could not parse line, expecting from/to timestamps: {timingLine}");
+                continue;
             }
-            Console.WriteLine($"Could not parse line, expecting a sequence number: {text}");
+
+            subTitle.From = from;
+            subTitle.To = to;
+
+            var textBuilder = new StringBuilder();
+            string? line;
+            while (!string.IsNullOrEmpty(line = sr.ReadLine()))
+            {
+                textBuilder.Append(CleanHtmlTags(line)).Append(' ');
+            }
+
+            subTitle.Text = textBuilder.ToString();
+            subTitles.Add(subTitle);
         }
 
-        if (subTitles is null || subTitles.Count < 1)
+        if (subTitles.Count < 1)
         {
-            Console.WriteLine("No subtitle found in input file, returning empty.");
+            Console.WriteLine("    No subtitle entries found in input file.");
             return string.Empty;
         }
 
         var lrcFileContent = new StringBuilder();
         foreach (var subTitle in subTitles)
         {
-            var currentLine = "[";
-            int day = CleanInt(subTitle.From.ToString("%d"));
-            int hour = CleanInt(subTitle.From.ToString("%h"));
-            int minute = CleanInt(subTitle.From.ToString("%m"));
-            int totalMinutes = day * 1440 + hour * 60 + minute;
-            currentLine += (totalMinutes > 9) ? totalMinutes.ToString() : "0" + totalMinutes.ToString();
-            currentLine += subTitle.From.ToString("\\:ss\\.ff");
-            currentLine += "]";
-            if (subTitle.Text != null)
-            {
-                currentLine += CleanText(subTitle.Text);
-                lrcFileContent.AppendLine(currentLine);
-            }
+            if (string.IsNullOrEmpty(subTitle.Text)) continue;
+
+            var totalMinutes =
+                subTitle.From.Days * 1440 +
+                subTitle.From.Hours * 60 +
+                subTitle.From.Minutes;
+
+            var timestamp = totalMinutes.ToString("D2", CultureInfo.InvariantCulture) +
+                             subTitle.From.ToString("\\:ss\\.ff", CultureInfo.InvariantCulture);
+
+            lrcFileContent.Append('[').Append(timestamp).Append(']').AppendLine(CleanText(subTitle.Text));
         }
 
         lrcFileContent.AppendLine();
         return lrcFileContent.ToString();
+    }
+
+    /// <summary>Reads lines until a non-empty one is found, or returns null at end of stream.</summary>
+    private static string? ReadNextNonEmptyLine(StreamReader sr)
+    {
+        string? text;
+        do
+        {
+            text = sr.ReadLine();
+        } while (text is not null && string.IsNullOrEmpty(text) && sr.Peek() >= 0);
+
+        return string.IsNullOrEmpty(text) ? null : text;
     }
 
     private static void WriteLrcFile(string fileFullName, string content, Encoding encoding)
@@ -166,23 +177,7 @@ class SrtToLrcConverterSimple
         File.WriteAllText(fileFullName, content + Environment.NewLine, encoding);
     }
 
-    private static string CleanHtmlTags(string input)
-    { 
-        var stripHtmlExpression = new Regex("<\\S[^><]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Multiline | RegexOptions.CultureInvariant | RegexOptions.Compiled);
-        return stripHtmlExpression.Replace(CleanText(input), string.Empty);
-    }
+    private static string CleanHtmlTags(string input) => HtmlTagPattern.Replace(CleanText(input), string.Empty);
 
-    private static int CleanInt(string input)
-    {
-        if (string.IsNullOrEmpty(input)) return 0;
-        if (int.TryParse(input, out int result))
-            return result;
-        return 0;
-    }
-
-    private static string CleanText(string input)
-    {
-        if (string.IsNullOrEmpty(input)) return string.Empty;
-        return input.Trim();
-    }
+    private static string CleanText(string? input) => string.IsNullOrEmpty(input) ? string.Empty : input.Trim();
 }
