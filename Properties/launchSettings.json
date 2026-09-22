@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "SrtToLrcConverterSimple": {
-      "commandName": "Project",
-      "commandLineArgs": "C:\\Path\\To\\SrtFiles"
-    }
-  }
-}
