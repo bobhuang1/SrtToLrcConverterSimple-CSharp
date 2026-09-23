@@ -1,30 +1,39 @@
 using SrtToLrcConverter;
 
-// Batch-converts .srt subtitle files to .lrc lyric files (the format used by many
-// music players for synchronized lyrics), recursively through a given directory.
+// Batch-converts subtitle files (SRT, VTT, SSA/ASS, SAMI, MicroDVD, MPL2,
+// PJS, TTML/DFXP) to .lrc lyric files (the format used by many music players
+// for synchronized lyrics), recursively through a given directory.
 
 if (args.Length == 0)
 {
-    Console.WriteLine("Usage: SrtToLrcConverterSimple <path to folder containing .srt files>");
+    Console.WriteLine(
+        "Usage: SrtToLrcConverterSimple <path to folder containing subtitle files>");
+    Console.WriteLine("Supported input formats: SRT, VTT, SSA/ASS, SAMI, MicroDVD, MPL2, PJS, TTML/DFXP.");
     return 1;
 }
 
-var pathToSrtFiles = args[0].Trim();
-var dir = new DirectoryInfo(pathToSrtFiles);
+var pathToSubtitleFiles = args[0].Trim();
+var dir = new DirectoryInfo(pathToSubtitleFiles);
 
-if (string.IsNullOrEmpty(pathToSrtFiles) || !dir.Exists)
+if (string.IsNullOrEmpty(pathToSubtitleFiles) || !dir.Exists)
 {
-    Console.WriteLine($"Input directory does not exist: \"{pathToSrtFiles}\"");
+    Console.WriteLine($"Input directory does not exist: \"{pathToSubtitleFiles}\"");
     return 1;
 }
 
-Console.WriteLine($"Input directory: {pathToSrtFiles}");
+Console.WriteLine($"Input directory: {pathToSubtitleFiles}");
 
 var options = new LrcConversionOptions();
 var converter = new SrtToLrcConverter.SrtToLrcConverter();
 
 // Assumes discovery permissions for all folders under the specified path.
-var fileList = dir.GetFiles("*" + options.InputExtension, SearchOption.AllDirectories);
+// Scans each supported extension union, de-duplicated by full path.
+var fileList = options.InputExtensions
+    .Select(ext => dir.GetFiles("*" + ext, SearchOption.AllDirectories))
+    .SelectMany(files => files)
+    .GroupBy(f => f.FullName)
+    .Select(g => g.First())
+    .ToArray();
 var convertedCount = 0;
 
 foreach (var file in fileList)
@@ -44,7 +53,8 @@ foreach (var file in fileList)
         continue;
     }
 
-    Console.WriteLine($"  {file.Name} -> {Path.GetFileName(result.OutputPath)}");
+    var format = SubtitleFormat.DisplayName(result.Format);
+    Console.WriteLine($"  {file.Name} [{format}] -> {Path.GetFileName(result.OutputPath)}");
 
     foreach (var warning in result.Lrc?.Warnings ?? [])
     {

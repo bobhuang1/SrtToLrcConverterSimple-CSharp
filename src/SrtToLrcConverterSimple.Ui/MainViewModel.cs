@@ -9,13 +9,13 @@ using SrtToLrcConverter;
 
 namespace SrtToLrcConverterSimple.Ui;
 
-/// <summary>A named encoding choice for the UI dropdown.</summary>
+/// <summary>A named encoding choice for the UI dropdown. Null = auto-detect.</summary>
 public sealed class EncodingOption
 {
     public string Label { get; }
-    public Encoding Encoding { get; }
+    public Encoding? Encoding { get; }
 
-    public EncodingOption(string label, Encoding encoding)
+    public EncodingOption(string label, Encoding? encoding)
     {
         Label = label;
         Encoding = encoding;
@@ -67,6 +67,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel()
     {
+        _encodings.Add(new EncodingOption("Auto-detect (recommended)", null));
         _encodings.Add(new EncodingOption("UTF-8", Encoding.UTF8));
         _encodings.Add(new EncodingOption("UTF-8 with BOM", new UTF8Encoding(true)));
         _encodings.Add(new EncodingOption("UTF-16 LE", Encoding.Unicode));
@@ -209,7 +210,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         if (IsFolderMode)
         {
-            var dlg = new OpenFolderDialog { Title = "Select a folder containing .srt files" };
+            var dlg = new OpenFolderDialog { Title = "Select a folder containing subtitle files" };
             if (dlg.ShowDialog() == true)
             {
                 InputPath = dlg.FolderName;
@@ -219,8 +220,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             var dlg = new OpenFileDialog
             {
-                Title = "Select an .srt file",
-                Filter = "SRT subtitle files (*.srt)|*.srt|All files (*.*)|*.*",
+                Title = "Select a subtitle file",
+                Filter = "Subtitle files (*.srt;*.vtt;*.ass;*.ssa;*.smi;*.sub;*.mpl2;*.pjs;*.ttml;*.dfxp)|*.srt;*.vtt;*.ass;*.ssa;*.smi;*.sub;*.mpl2;*.pjs;*.ttml;*.dfxp|All files (*.*)|*.*",
             };
             if (dlg.ShowDialog() == true)
             {
@@ -248,9 +249,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 return [];
             }
 
-            return Directory
-                .EnumerateFiles(InputPath, "*" + options.InputExtension,
-                    new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
+            return options.InputExtensions
+                .SelectMany(ext => Directory.EnumerateFiles(InputPath, "*" + ext,
+                    new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true }))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 
@@ -272,7 +274,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         var options = new LrcConversionOptions
         {
-            Encoding = SelectedEncoding?.Encoding ?? Encoding.UTF8,
+            Encoding = SelectedEncoding?.Encoding,
             OutputDirectory = OverrideOutputDir ? OutputDirectory : null,
             FilenameSuffixesToStrip = SuffixListText
                 .Split('\n')

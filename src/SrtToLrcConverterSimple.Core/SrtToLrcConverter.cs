@@ -1,17 +1,16 @@
 using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
 using File = System.IO.File;
 
 namespace SrtToLrcConverter;
 
-/// <summary>A single parsed SRT subtitle entry.</summary>
+/// <summary>A single parsed subtitle entry.</summary>
 public sealed record SubTitle(int Sequence, TimeSpan From, TimeSpan To, string Text);
 
 /// <summary>A non-fatal parse note (unparseable or skipped entry).</summary>
 public sealed record SrtWarning(int Sequence, string Message);
 
-/// <summary>Parsed SRT content rendered as LRC text, plus any warnings.</summary>
+/// <summary>Parsed subtitle content rendered as LRC text, plus any warnings.</summary>
 public sealed record LrcOutput(string Text, IReadOnlyList<SrtWarning> Warnings);
 
 /// <summary>Outcome of converting one file.</summary>
@@ -20,19 +19,24 @@ public sealed record FileConversionResult(
     string OutputPath,
     LrcOutput? Lrc,
     bool Converted,
-    string? Error);
+    string? Error,
+    SubtitleFormatKind Format = SubtitleFormatKind.Srt);
 
 /// <summary>Tunables for a conversion batch.</summary>
 public sealed class LrcConversionOptions
 {
-    /// <summary>Input file extension filter, e.g. ".srt".</summary>
-    public string InputExtension { get; init; } = ".srt";
+    /// <summary>Input file extension filters scanned in folder mode.</summary>
+    public string[] InputExtensions { get; set; } = SubtitleFormat.SupportedExtensions;
 
     /// <summary>Output file extension, e.g. ".lrc".</summary>
-    public string OutputExtension { get; init; } = ".lrc";
+    public string OutputExtension { get; set; } = ".lrc";
 
-    /// <summary>Encoding used to read the SRT and write the LRC. Defaults to UTF-8.</summary>
-    public Encoding Encoding { get; set; } = Encoding.UTF8;
+    /// <summary>
+    /// Encoding used to read the input and write the LRC. When null (the
+    /// default) the input is auto-detected from BOM/UTF-8/strictness and the
+    /// output is written as UTF-8.
+    /// </summary>
+    public Encoding? Encoding { get; set; }
 
     /// <summary>
     /// Known filename suffixes (e.g. from auto-generated/auto-translated caption
@@ -43,123 +47,49 @@ public sealed class LrcConversionOptions
 
     /// <summary>
     /// Optional output directory. When null, each LRC is written next to its
-    /// source SRT file.
+    /// source subtitle file.
     /// </summary>
     public string? OutputDirectory { get; set; }
 }
 
-/// <summary>Converts SRT subtitle text to LRC lyric format.</summary>
+/// <summary>Converts subtitle text (many formats) to LRC lyric format.</summary>
 public sealed class SrtToLrcConverter
 {
-    private static readonly Regex HtmlTagPattern = new(
-        "<\\S[^><]*>",
-        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    /// <summary>Parses subtitle text and renders it as LRC text, auto-detecting the format.</summary>
+    public LrcOutput Parse(string text) => Parse(text, SubtitleFormat.Detect(string.Empty, text));
 
-    private sealed record SubTitleDraft(int Sequence, TimeSpan From, TimeSpan To, string? Text);
-
-    /// <summary>Parses SRT text and renders it as LRC text.</summary>
-    public LrcOutput Parse(string srtText)
+    /// <summary>Parses subtitle text of an explicit format and renders LRC text.</summary>
+    public LrcOutput Parse(string text, SubtitleFormatKind kind)
     {
         var warnings = new List<SrtWarning>();
-        var subTitles = new List<SubTitleDraft>();
-        var lines = srtText.Replace("\r\n", "\n").Split('\n');
-
-        for (int i = 0; i < lines.Length; i++)
-        {
-            var text = Clean(lines[i]);
-            if (text.Length == 0)
-            {
-                continue; // blank line
-            }
-
-            if (!int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var sequence))
-            {
-                warnings.Add(new SrtWarning(0, $"Could not parse line, expecting a sequence number: {text}"));
-                continue;
-            }
-
-            // timing line
-            if (++i >= lines.Length)
-            {
-                warnings.Add(new SrtWarning(sequence, "Timing line missing for entry."));
-                break;
-            }
-
-            var timingLine = lines[i];
-            var timingParts = timingLine.Split(
-                new[] { "-->" }, StringSplitOptions.RemoveEmptyEntries);
-
-            if (timingParts.Length != 2 ||
-                !TimeSpan.TryParseExact(timingParts[0].Trim(), "hh\\:mm\\:ss\\,fff", CultureInfo.InvariantCulture, out var from) ||
-                !TimeSpan.TryParseExact(timingParts[1].Trim(), "hh\\:mm\\:ss\\,fff", CultureInfo.InvariantCulture, out var to))
-            {
-                warnings.Add(new SrtWarning(sequence, $"Could not parse line, expecting from/to timestamps: {timingLine}"));
-                continue;
-            }
-
-            // caption text: one or more lines until the next blank line
-            var textBuilder = new StringBuilder();
-            while (++i < lines.Length)
-            {
-                var subLine = lines[i];
-                if (subLine.Trim().Length == 0)
-                {
-                    break;
-                }
-                textBuilder.Append(RemoveHtmlTags(subLine)).Append(' ');
-            }
-
-            subTitles.Add(new SubTitleDraft(sequence, from, to, textBuilder.ToString()));
-        }
-
-        if (subTitles.Count < 1)
-        {
-            warnings.Add(new SrtWarning(0, "No subtitle entries found in input file."));
-            return new LrcOutput(string.Empty, warnings);
-        }
-
-        var lrc = new StringBuilder();
-        foreach (var sub in subTitles)
-        {
-            if (string.IsNullOrWhiteSpace(sub.Text))
-            {
-                continue;
-            }
-
-            var totalMinutes =
-                sub.From.Days * 1440 +
-                sub.From.Hours * 60 +
-                sub.From.Minutes;
-
-            var timestamp = totalMinutes.ToString("D2", CultureInfo.InvariantCulture) +
-                            sub.From.ToString("\\:ss\\.ff", CultureInfo.InvariantCulture);
-
-            lrc.Append('[').Append(timestamp).Append(']').AppendLine(Clean(sub.Text));
-        }
-
-        lrc.AppendLine();
-        return new LrcOutput(lrc.ToString(), warnings);
+        var subtitles = SubtitleParsers.Parse(kind, text, warnings);
+        return new LrcOutput(RenderLrc(subtitles), warnings);
     }
 
-    /// <summary>Converts one SRT file to an LRC file on disk.</summary>
+    /// <summary>Converts one subtitle file to an LRC file on disk.</summary>
     public FileConversionResult ConvertFile(string inputPath, LrcConversionOptions options)
     {
         var outputPath = GetOutputPath(inputPath, options);
 
         try
         {
-            var srtText = ReadAllText(inputPath, options.Encoding);
-            var lrc = Parse(srtText);
+            var text = options.Encoding is null
+                ? SubtitleTextDecoder.ReadAllText(inputPath)
+                : File.ReadAllText(inputPath, options.Encoding);
+
+            var kind = SubtitleFormat.Detect(inputPath, text);
+            var lrc = Parse(text, kind);
 
             if (lrc.Text.Length == 0)
             {
                 // Matches the classic CLI behaviour: an input with no usable
                 // subtitles is reported, not treated as an error.
-                return new FileConversionResult(inputPath, outputPath, lrc, false, null);
+                return new FileConversionResult(inputPath, outputPath, lrc, false, null, kind);
             }
 
-            WriteAllText(outputPath, lrc.Text + Environment.NewLine, options.Encoding);
-            return new FileConversionResult(inputPath, outputPath, lrc, true, null);
+            var outputEncoding = options.Encoding ?? Encoding.UTF8;
+            File.WriteAllText(outputPath, lrc.Text + Environment.NewLine, outputEncoding);
+            return new FileConversionResult(inputPath, outputPath, lrc, true, null, kind);
         }
         catch (Exception ex)
         {
@@ -167,7 +97,7 @@ public sealed class SrtToLrcConverter
         }
     }
 
-    /// <summary>Computes the LRC output path for a given SRT input path.</summary>
+    /// <summary>Computes the LRC output path for a given input path.</summary>
     public string GetOutputPath(string inputPath, LrcConversionOptions options)
     {
         var fileName = Path.GetFileName(inputPath);
@@ -184,13 +114,28 @@ public sealed class SrtToLrcConverter
         return Path.Combine(targetDir ?? string.Empty, targetName);
     }
 
-    private static string ReadAllText(string path, Encoding encoding) => File.ReadAllText(path, encoding);
+    private static string RenderLrc(IReadOnlyList<SubTitle> subtitles)
+    {
+        var lrc = new StringBuilder();
+        foreach (var sub in subtitles)
+        {
+            if (string.IsNullOrWhiteSpace(sub.Text))
+            {
+                continue;
+            }
 
-    private static void WriteAllText(string path, string content, Encoding encoding) =>
-        File.WriteAllText(path, content, encoding);
+            var totalMinutes =
+                sub.From.Days * 1440 +
+                sub.From.Hours * 60 +
+                sub.From.Minutes;
 
-    private static string RemoveHtmlTags(string input) => HtmlTagPattern.Replace(Clean(input), string.Empty);
+            var timestamp = totalMinutes.ToString("D2", CultureInfo.InvariantCulture) +
+                            sub.From.ToString("\\:ss\\.ff", CultureInfo.InvariantCulture);
 
-    private static string Clean(string? input) =>
-        string.IsNullOrEmpty(input) ? string.Empty : input.Trim();
+            lrc.Append('[').Append(timestamp).Append(']').AppendLine(sub.Text.Trim());
+        }
+
+        lrc.AppendLine();
+        return lrc.ToString();
+    }
 }

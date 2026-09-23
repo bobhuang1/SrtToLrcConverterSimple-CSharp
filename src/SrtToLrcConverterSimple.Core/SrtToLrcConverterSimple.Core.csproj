@@ -7,4 +7,8 @@
     <RootNamespace>SrtToLrcConverter</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="SrtToLrcConverterSimple.Tests" />
+  </ItemGroup>
+
 </Project>
