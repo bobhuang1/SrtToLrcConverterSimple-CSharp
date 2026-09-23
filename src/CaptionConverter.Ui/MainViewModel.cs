@@ -7,7 +7,7 @@ using System.Windows.Input;
 using Microsoft.Win32;
 using SrtToLrcConverter;
 
-namespace SrtToLrcConverterSimple.Ui;
+namespace CaptionConverter.Ui;
 
 /// <summary>A named encoding choice for the UI dropdown. Null = auto-detect.</summary>
 public sealed class EncodingOption

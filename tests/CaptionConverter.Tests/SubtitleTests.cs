@@ -2,7 +2,7 @@ using System.Text;
 using SrtToLrcConverter;
 using Xunit;
 
-namespace SrtToLrcConverterSimple.Tests;
+namespace CaptionConverter.Tests;
 
 public class SubtitleFormatTests
 {

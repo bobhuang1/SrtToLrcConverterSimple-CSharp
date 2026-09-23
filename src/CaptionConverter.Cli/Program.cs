@@ -7,7 +7,7 @@ using SrtToLrcConverter;
 if (args.Length == 0)
 {
     Console.WriteLine(
-        "Usage: SrtToLrcConverterSimple <path to folder containing subtitle files>");
+        "Usage: CaptionConverter <path to folder containing subtitle files>");
     Console.WriteLine("Supported input formats: SRT, VTT, SSA/ASS, SAMI, MicroDVD, MPL2, PJS, TTML/DFXP.");
     return 1;
 }

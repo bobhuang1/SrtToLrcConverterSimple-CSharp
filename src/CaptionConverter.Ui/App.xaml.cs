@@ -1,8 +1,8 @@
-﻿using System.Configuration;
+using System.Configuration;
 using System.Data;
 using System.Windows;
 
-namespace SrtToLrcConverterSimple.Ui;
+namespace CaptionConverter.Ui;
 
 /// <summary>
 /// Interaction logic for App.xaml

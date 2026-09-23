@@ -1,7 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\SrtToLrcConverterSimple.Core\SrtToLrcConverterSimple.Core.csproj" />
+    <ProjectReference Include="..\CaptionConverter.Core\CaptionConverter.Core.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

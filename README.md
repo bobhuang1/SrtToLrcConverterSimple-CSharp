@@ -1,4 +1,4 @@
-# SrtToLrcConverterSimple
+# CaptionConverter
 
 Converts caption/subtitle files into `.lrc` synchronized-lyrics files — the
 format most music players use for scrolling lyrics. Available as both a
@@ -21,8 +21,9 @@ core.
   | TTML / DFXP (XML) | `.ttml`, `.dfxp` |
 - Html tag stripping: styled captions like `<i>Hello</i>` become `Hello`
   (SSA/ASS `{\i1}` overrides stripped too).
-- Auto-generated/auto-translated caption suffixes (e.g. `_中文（自动翻译）`) are
-  stripped from output filenames; the suffix list is user-editable.
+- Auto-generated/auto-translated caption suffixes (e.g. `_auto_translated` or
+  `-auto-gen`) are stripped from output filenames; the suffix list is
+  user-editable.
 - **Auto-detect file encoding** (BOM, then UTF-8, then system ANSI fallback),
   or pin an explicit one: UTF-8, UTF-8 with BOM, UTF-16 LE/BE, UTF-32, ANSI.
 - Optional output folder override (default: same folder as the source file).
@@ -33,21 +34,21 @@ core.
 ## Project layout
 
 ```
-SrtToLrcConverterSimple.sln
+CaptionConverter.sln
 ├── src/
-│   ├── SrtToLrcConverterSimple.Core   library — subtitle parsing (8 formats),
+│   ├── CaptionConverter.Core   library — subtitle parsing (8 formats),
 │   │                                   content/encoding auto-detection, LRC
 │   │                                   rendering & naming options
-│   ├── SrtToLrcConverterSimple.Cli    console app — batch-converts a folder
-│   └── SrtToLrcConverterSimple.Ui     WPF desktop app — folder/file picker,
+│   ├── CaptionConverter.Cli    console app — batch-converts a folder
+│   └── CaptionConverter.Ui     WPF desktop app — folder/file picker,
 │                                       options, results list, LRC preview
 └── tests/
-    └── SrtToLrcConverterSimple.Tests  xUnit — per-format parser, detection,
+    └── CaptionConverter.Tests  xUnit — per-format parser, detection,
                                         rendering & encoding tests
 ```
 
 All projects target **.NET 10** and are referenced from
-`SrtToLrcConverterSimple.sln`.
+`CaptionConverter.sln`.
 
 ## Prerequisites
 
@@ -59,12 +60,12 @@ All projects target **.NET 10** and are referenced from
 ### Launch
 
 ```
-dotnet run --project src/SrtToLrcConverterSimple.Ui
+dotnet run --project src/CaptionConverter.Ui
 ```
 
-or open `SrtToLrcConverterSimple.sln` in Visual Studio 2022+ and press **F5**,
+or open `CaptionConverter.sln` in Visual Studio 2022+ and press **F5**,
 or run the built executable
-`src/SrtToLrcConverterSimple.Ui/bin/Debug/net10.0-windows/SrtToLrcConverterSimple.Ui.exe`.
+`src/CaptionConverter.Ui/bin/Debug/net10.0-windows/CaptionConverter.Ui.exe`.
 
 ### Using the app
 
@@ -79,9 +80,10 @@ or run the built executable
      selected encoding (UTF-8 when auto-detect is in effect).
    - *Output to a different folder*: tick to send all `.lrc` files to one
      destination; unticked, each `.lrc` is written next to its source.
-   - *Filename suffixes to strip*: one per line. Every matched substring is
-     removed from the output filename. Pre-filled with the common
-     `_中文（自动翻译）` / `_中文（自动生成）` / `（自动生成）` suffixes.
+- *Filename suffixes to strip*: one per line. Every matched substring is
+      removed from the output filename. Pre-filled with a few common
+      auto-caption patterns (e.g. `_auto_translated`, `_auto-gen`); edit to
+      match your own caption exports.
 3. Click **Convert**. The results list fills with one row per file:
    - `OK` — converted; selecting the row previews the generated LRC.
    - `Skipped` — no usable subtitles found; preview shows the reason.
@@ -95,7 +97,7 @@ or run the built executable
 ### Usage
 
 ```
-SrtToLrcConverterSimple.Cli <path to folder containing subtitle files>
+CaptionConverter.Cli <path to folder containing subtitle files>
 ```
 
 Supported input formats: SRT, VTT, SSA/ASS, SAMI, MicroDVD, MPL2, PJS,
@@ -105,14 +107,14 @@ TTML/DFXP.
 
 ```
 # from the repo root
-dotnet run --project src/SrtToLrcConverterSimple.Cli -- "C:\Music\Lyrics"
-dotnet run --project src/SrtToLrcConverterSimple.Cli -- "C:\Music\Songs with spaces"
+dotnet run --project src/CaptionConverter.Cli -- "C:\Music\Lyrics"
+dotnet run --project src/CaptionConverter.Cli -- "C:\Music\Songs with spaces"
 ```
 
 or call the built executable directly:
 
 ```
-src\SrtToLrcConverterSimple.Cli\bin\Debug\net10.0\SrtToLrcConverterSimple.Cli.exe "C:\Music"
+src\CaptionConverter.Cli\bin\Debug\net10.0\CaptionConverter.Cli.exe "C:\Music"
 ```
 
 ### Behaviour
@@ -126,7 +128,7 @@ src\SrtToLrcConverterSimple.Cli\bin\Debug\net10.0\SrtToLrcConverterSimple.Cli.ex
 
   ```
   Input directory: C:\Music\Lyrics
-    happy_中文（自动翻译）.srt [SubRip (SRT)] -> happy.lrc
+    song_auto_translated.srt [SubRip (SRT)] -> song.lrc
     outro.vtt [WebVTT] -> outro.lrc
     (3) Could not parse line, expecting from/to timestamps: ...
   Done. Converted 2 of 3 file(s).
@@ -152,12 +154,12 @@ src\SrtToLrcConverterSimple.Cli\bin\Debug\net10.0\SrtToLrcConverterSimple.Cli.ex
   open-ended captions in SAMI/MicroDVD roll into the next cue's start.
 - Default output location is the source file's folder (UI can override).
 - To change CLI behaviour (encodings, output folder, suffix list), use the
-  core options class `LrcConversionOptions` in `src/SrtToLrcConverterSimple.Core`.
+  core options class `LrcConversionOptions` in `src/CaptionConverter.Core`.
 
 ## Build & test
 
 ```
-dotnet build SrtToLrcConverterSimple.sln
+dotnet build CaptionConverter.sln
 dotnet test
 ```
 

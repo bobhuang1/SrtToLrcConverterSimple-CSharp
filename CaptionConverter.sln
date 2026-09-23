@@ -1,19 +1,19 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SrtToLrcConverterSimple.Core", "src\SrtToLrcConverterSimple.Core\SrtToLrcConverterSimple.Core.csproj", "{84173A06-859B-4303-84C0-EE8ED45202CF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CaptionConverter.Core", "src\CaptionConverter.Core\CaptionConverter.Core.csproj", "{84173A06-859B-4303-84C0-EE8ED45202CF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SrtToLrcConverterSimple.Cli", "src\SrtToLrcConverterSimple.Cli\SrtToLrcConverterSimple.Cli.csproj", "{003E0D96-24D3-4053-A78C-AD2F99F3DF80}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CaptionConverter.Cli", "src\CaptionConverter.Cli\CaptionConverter.Cli.csproj", "{003E0D96-24D3-4053-A78C-AD2F99F3DF80}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SrtToLrcConverterSimple.Ui", "src\SrtToLrcConverterSimple.Ui\SrtToLrcConverterSimple.Ui.csproj", "{2E6E801F-01A7-41E3-BD36-39666077451A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CaptionConverter.Ui", "src\CaptionConverter.Ui\CaptionConverter.Ui.csproj", "{2E6E801F-01A7-41E3-BD36-39666077451A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SrtToLrcConverterSimple.Tests", "tests\SrtToLrcConverterSimple.Tests\SrtToLrcConverterSimple.Tests.csproj", "{AD15A352-BDC2-4D2C-A5E2-8D3B89BB5E1F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CaptionConverter.Tests", "tests\CaptionConverter.Tests\CaptionConverter.Tests.csproj", "{AD15A352-BDC2-4D2C-A5E2-8D3B89BB5E1F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

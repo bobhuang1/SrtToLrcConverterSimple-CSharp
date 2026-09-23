@@ -1,6 +1,6 @@
-﻿using System.Windows;
+using System.Windows;
 
-namespace SrtToLrcConverterSimple.Ui;
+namespace CaptionConverter.Ui;
 
 /// <summary>
 /// Interaction logic for MainWindow.xaml
