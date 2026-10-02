@@ -241,6 +241,7 @@ public class ConversionTests
     [Fact]
     public void ConvertFile_FallsBackToAnsiForNonUtf8Bytes()
     {
+        using var _ = new CultureScope("en-US");
         var tempDir = Path.Combine(Path.GetTempPath(), "SrtToLrcTests_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
         try
@@ -253,11 +254,56 @@ public class ConversionTests
             var result = converter.ConvertFile(path, new LrcConversionOptions { OutputDirectory = tempDir });
 
             Assert.True(result.Converted);
-            Assert.Contains("Caf", result.Lrc!.Text);
+            // Must be the real character, not "Caf" plus a U+FFFD replacement character.
+            Assert.Contains("Café", result.Lrc!.Text);
         }
         finally
         {
             Directory.Delete(tempDir, recursive: true);
         }
     }
+}
+
+public class EncodingAndTimingTests
+{
+    [Fact]
+    public void Decode_FallsBackToTheCultureAnsiCodePage_ForGbkBytes()
+    {
+        using var _ = new CultureScope("zh-CN");
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        var gbk = System.Text.Encoding.GetEncoding(936).GetBytes("1\n00:00:01,000 --> 00:00:04,000\n你好世界\n");
+
+        var text = SubtitleTextDecoder.Decode(gbk);
+
+        Assert.Contains("你好世界", text);
+        Assert.DoesNotContain('�', text);
+    }
+
+    [Theory]
+    [InlineData("00:00:01.500", 1500)]
+    [InlineData("00:00:01.5", 1500)]
+    [InlineData("00:00:01.05", 1050)]
+    [InlineData("00:01:02.1234567", 62123)]
+    [InlineData("1.25s", 1250)]
+    [InlineData("750ms", 750)]
+    public void Ttml_Fractional_Times_Are_Milliseconds(string begin, int expectedMs)
+    {
+        var ttml = $"<tt xmlns=\"http://www.w3.org/ns/ttml\"><body><div><p begin=\"{begin}\" end=\"00:00:09.000\">Hi</p></div></body></tt>";
+        var warnings = new List<SrtWarning>();
+
+        var subs = SubtitleParsers.Parse(SubtitleFormatKind.Ttml, ttml, warnings);
+
+        Assert.Single(subs);
+        Assert.Equal(TimeSpan.FromMilliseconds(expectedMs), subs[0].From);
+    }
+}
+
+internal sealed class CultureScope : IDisposable
+{
+    private readonly System.Globalization.CultureInfo _previous = System.Globalization.CultureInfo.CurrentCulture;
+
+    public CultureScope(string name) =>
+        System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo(name);
+
+    public void Dispose() => System.Globalization.CultureInfo.CurrentCulture = _previous;
 }

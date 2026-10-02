@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -180,7 +181,32 @@ public static class SubtitleTextDecoder
             // Not valid UTF-8; fall through to the ANSI codepage.
         }
 
-        return Encoding.Default.GetString(bytes);
+        return AnsiEncoding.GetString(bytes);
+    }
+
+    /// <summary>
+    /// The system's legacy ANSI code page (e.g. GBK/936 on Simplified Chinese Windows,
+    /// Big5/950 on Traditional Chinese, Shift-JIS/932 on Japanese, 1252 on Western).
+    /// <see cref="Encoding.Default"/> cannot be used for this: on .NET Core and later it is
+    /// always UTF-8, so "falling back" to it would just decode invalid UTF-8 as UTF-8 again.
+    /// </summary>
+    public static Encoding AnsiEncoding
+    {
+        get
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            var codePage = CultureInfo.CurrentCulture.TextInfo.ANSICodePage;
+            try
+            {
+                // ANSICodePage is 0 on some non-Windows invariant setups; 1252 is the
+                // conventional Western default there.
+                return Encoding.GetEncoding(codePage == 0 ? 1252 : codePage);
+            }
+            catch (ArgumentException)
+            {
+                return Encoding.GetEncoding(1252);
+            }
+        }
     }
 
     /// <summary>Reads a file path as text using <see cref="Decode"/>.</summary>

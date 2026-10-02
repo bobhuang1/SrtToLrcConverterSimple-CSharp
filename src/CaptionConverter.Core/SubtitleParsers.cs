@@ -137,7 +137,9 @@ internal static class SubtitleParsers
             if (m.Groups[4].Success)
             {
                 var f = m.Groups[4].Value;
-                fracMs = long.Parse(f) * (1000L * (long)Math.Pow(10, Math.Max(0, 3 - f.Length)));
+                // Fraction of a second, normalised to milliseconds: ".5" -> 500, ".05" -> 50,
+                // ".1234567" -> 123 (extra digits truncated).
+                fracMs = long.Parse(f.PadRight(3, '0')[..3]);
             }
 
             value = TimeSpan.FromMilliseconds(hours * 3600000L + minutes * 60000L + seconds * 1000L + fracMs);

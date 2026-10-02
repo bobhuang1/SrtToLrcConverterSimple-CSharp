@@ -73,7 +73,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _encodings.Add(new EncodingOption("UTF-16 LE", Encoding.Unicode));
         _encodings.Add(new EncodingOption("UTF-16 BE", Encoding.BigEndianUnicode));
         _encodings.Add(new EncodingOption("UTF-32", Encoding.UTF32));
-        _encodings.Add(new EncodingOption("System default (ANSI)", Encoding.Default));
+        _encodings.Add(new EncodingOption("System default (ANSI)", SubtitleTextDecoder.AnsiEncoding));
         _selectedEncoding = _encodings[0];
 
         var defaults = new LrcConversionOptions().FilenameSuffixesToStrip;
