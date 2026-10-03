@@ -76,6 +76,11 @@ internal static class SubtitleParsers
             return [];
         }
 
+        // LRC is read top to bottom, so emit entries in time order. SSA/ASS (layers,
+        // signs, karaoke), SAMI and TTML can list them out of order. OrderBy is a
+        // stable sort, so entries with the same start keep their file order.
+        subs = subs.OrderBy(s => s.From).ToList();
+
         // Formats that lack an end time: hold each entry open until the next
         // start so short LRC timestamps still come out in order.
         for (int i = 0; i + 1 < subs.Count; i++)

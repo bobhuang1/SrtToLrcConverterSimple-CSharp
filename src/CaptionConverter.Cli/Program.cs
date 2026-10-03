@@ -35,10 +35,11 @@ var fileList = options.InputExtensions
     .Select(g => g.First())
     .ToArray();
 var convertedCount = 0;
+var claimedOutputs = SrtToLrcConverter.SrtToLrcConverter.NewOutputSet();
 
 foreach (var file in fileList)
 {
-    var result = converter.ConvertFile(file.FullName, options);
+    var result = converter.ConvertFile(file.FullName, options, claimedOutputs);
 
     if (!result.Converted)
     {

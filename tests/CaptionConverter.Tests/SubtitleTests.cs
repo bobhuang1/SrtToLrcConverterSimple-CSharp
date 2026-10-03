@@ -81,6 +81,21 @@ public class SubtitleParserTests
     }
 
     [Fact]
+    public void Ass_OutOfOrderDialogue_IsSortedByStartTime()
+    {
+        const string ass =
+            "[Events]\n" +
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n" +
+            "Dialogue: 0,0:00:05.00,0:00:06.00,Default,,0,0,0,,second\n" +
+            "Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,first\n" +
+            "Dialogue: 1,0:00:05.00,0:00:06.00,Sign,,0,0,0,,second sign\n";
+
+        var subs = SubtitleParsers.Parse(SubtitleFormatKind.SsaAss, ass, new List<SrtWarning>());
+
+        Assert.Equal(["first", "second", "second sign"], subs.Select(s => s.Text));
+    }
+
+    [Fact]
     public void Smi_ClosesEachSyncAtNextSync()
     {
         const string smi =
@@ -231,6 +246,39 @@ public class ConversionTests
             Assert.Equal(SubtitleFormatKind.Vtt, vttResult.Format);
             Assert.Contains("[00:01.50]Hello", vttResult.Lrc!.Text);
             Assert.True(File.Exists(Path.Combine(tempDir, "clip.lrc")));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ConvertFile_SameOutputNameInOneBatch_GetsANumberedSuffix()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "SrtToLrcTests_" + Guid.NewGuid().ToString("N"));
+        var outDir = Path.Combine(tempDir, "out");
+        Directory.CreateDirectory(Path.Combine(tempDir, "a"));
+        Directory.CreateDirectory(Path.Combine(tempDir, "b"));
+        Directory.CreateDirectory(outDir);
+        try
+        {
+            var first = Path.Combine(tempDir, "a", "song.srt");
+            var second = Path.Combine(tempDir, "b", "song.srt");
+            File.WriteAllText(first, "1\n00:00:01,000 --> 00:00:02,000\nfrom a\n");
+            File.WriteAllText(second, "1\n00:00:01,000 --> 00:00:02,000\nfrom b\n");
+
+            var converter = new SrtToLrcConverter.SrtToLrcConverter();
+            var options = new LrcConversionOptions { OutputDirectory = outDir };
+            var claimed = SrtToLrcConverter.SrtToLrcConverter.NewOutputSet();
+
+            var r1 = converter.ConvertFile(first, options, claimed);
+            var r2 = converter.ConvertFile(second, options, claimed);
+
+            Assert.Equal(Path.Combine(outDir, "song.lrc"), r1.OutputPath);
+            Assert.Equal(Path.Combine(outDir, "song (2).lrc"), r2.OutputPath);
+            Assert.Contains("from a", File.ReadAllText(r1.OutputPath));
+            Assert.Contains("from b", File.ReadAllText(r2.OutputPath));
         }
         finally
         {

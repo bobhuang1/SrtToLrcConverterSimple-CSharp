@@ -297,9 +297,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var rows = await Task.Run(() =>
         {
             var list = new List<ConvertRow>();
+            var claimedOutputs = SrtToLrcConverter.SrtToLrcConverter.NewOutputSet();
             foreach (var file in inputs)
             {
-                var result = _converter.ConvertFile(file, options);
+                var result = _converter.ConvertFile(file, options, claimedOutputs);
 
                 var detail = result.Lrc is null
                     ? (result.Error ?? string.Empty)

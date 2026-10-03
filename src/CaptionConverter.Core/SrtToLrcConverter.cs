@@ -67,9 +67,19 @@ public sealed class SrtToLrcConverter
     }
 
     /// <summary>Converts one subtitle file to an LRC file on disk.</summary>
-    public FileConversionResult ConvertFile(string inputPath, LrcConversionOptions options)
+    /// <param name="claimedOutputs">
+    /// Output paths already written in this batch. Pass the same set for every file of a
+    /// batch: when two inputs map to the same LRC name (same file name in different
+    /// folders with one output folder, or names that only differed by a stripped suffix),
+    /// the later one gets a " (2)", " (3)", ... suffix instead of overwriting the first.
+    /// </param>
+    public FileConversionResult ConvertFile(string inputPath, LrcConversionOptions options, ISet<string>? claimedOutputs = null)
     {
         var outputPath = GetOutputPath(inputPath, options);
+        if (claimedOutputs is not null)
+        {
+            outputPath = ClaimUniquePath(outputPath, claimedOutputs);
+        }
 
         try
         {
@@ -112,6 +122,30 @@ public sealed class SrtToLrcConverter
             : Path.GetDirectoryName(inputPath);
 
         return Path.Combine(targetDir ?? string.Empty, targetName);
+    }
+
+    /// <summary>A case-insensitive set for <see cref="ConvertFile"/>'s claimedOutputs.</summary>
+    public static ISet<string> NewOutputSet() => new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    private static string ClaimUniquePath(string path, ISet<string> claimed)
+    {
+        var full = Path.GetFullPath(path);
+        if (claimed.Add(full))
+        {
+            return path;
+        }
+
+        var dir = Path.GetDirectoryName(path) ?? string.Empty;
+        var name = Path.GetFileNameWithoutExtension(path);
+        var ext = Path.GetExtension(path);
+        for (var n = 2; ; n++)
+        {
+            var candidate = Path.Combine(dir, $"{name} ({n}){ext}");
+            if (claimed.Add(Path.GetFullPath(candidate)))
+            {
+                return candidate;
+            }
+        }
     }
 
     private static string RenderLrc(IReadOnlyList<SubTitle> subtitles)
