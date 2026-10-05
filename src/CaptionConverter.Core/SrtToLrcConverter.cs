@@ -39,6 +39,14 @@ public sealed class LrcConversionOptions
     public Encoding? Encoding { get; set; }
 
     /// <summary>
+    /// Encoding used only as the last-resort fallback when the input is
+    /// neither BOM-tagged nor valid UTF-8. When null the system default is
+    /// used, which is the machine ANSI codepage on Windows/desktop but UTF-8
+    /// on platforms without one (for example the browser WebAssembly host).
+    /// </summary>
+    public Encoding? AnsiEncoding { get; set; }
+
+    /// <summary>
     /// Known filename suffixes (e.g. from auto-generated/auto-translated caption
     /// exports) to strip from the output filename.
     /// </summary>
@@ -84,7 +92,7 @@ public sealed class SrtToLrcConverter
         try
         {
             var text = options.Encoding is null
-                ? SubtitleTextDecoder.ReadAllText(inputPath)
+                ? SubtitleTextDecoder.ReadAllText(inputPath, options.AnsiEncoding)
                 : File.ReadAllText(inputPath, options.Encoding);
 
             var kind = SubtitleFormat.Detect(inputPath, text);

@@ -156,10 +156,17 @@ public static class SubtitleFormat
 public static class SubtitleTextDecoder
 {
     /// <summary>
-    /// Decodes subtitle bytes: honours BOMs, then strict UTF-8, then the system
-    /// ANSI codepage as a last resort.
+    /// Decodes subtitle bytes: honours BOMs, then strict UTF-8, then an ANSI
+    /// codepage as a last resort.
     /// </summary>
-    public static string Decode(byte[] bytes)
+    /// <param name="bytes">Raw subtitle file bytes.</param>
+    /// <param name="ansiEncoding">
+    /// Overrides the encoding used for the last-resort non-UTF-8 fallback.
+    /// When null, <see cref="AnsiEncoding"/> decides, which resolves the real
+    /// system code page on desktop. A browser host has no meaningful system
+    /// code page, so it passes one explicitly (for example GB18030).
+    /// </param>
+    public static string Decode(byte[] bytes, Encoding? ansiEncoding = null)
     {
         var text = DecodeWithBom(bytes);
         if (text is not null)
@@ -181,7 +188,8 @@ public static class SubtitleTextDecoder
             // Not valid UTF-8; fall through to the ANSI codepage.
         }
 
-        return AnsiEncoding.GetString(bytes);
+        // An explicit override wins; otherwise use the real system ANSI code page.
+        return (ansiEncoding ?? AnsiEncoding).GetString(bytes);
     }
 
     /// <summary>
@@ -210,10 +218,10 @@ public static class SubtitleTextDecoder
     }
 
     /// <summary>Reads a file path as text using <see cref="Decode"/>.</summary>
-    public static string ReadAllText(string path)
+    public static string ReadAllText(string path, Encoding? ansiEncoding = null)
     {
         var bytes = System.IO.File.ReadAllBytes(path);
-        return bytes.Length == 0 ? string.Empty : Decode(bytes);
+        return bytes.Length == 0 ? string.Empty : Decode(bytes, ansiEncoding);
     }
 
     private static string? DecodeWithBom(byte[] bytes)
