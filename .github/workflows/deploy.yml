@@ -51,7 +51,33 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      # The smoke job polls this URL, so a CDN propagation failure fails
+      # the workflow instead of surfacing an hour later.
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
 
+  # A plain HTTP 200 on index.html proves nothing about a Pages deploy:
+  # while the CDN propagates, different edges can serve 200 and 503 at
+  # the same time. This job drives a real headless Chrome over the
+  # DevTools protocol and waits until the Blazor app has actually
+  # rendered its sample buttons, inside a bounded timeout.
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 is the first LTS with a global WebSocket, which the
+      # CDP driver uses to talk to Chrome.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Smoke test the live site
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: node tools/smoke.mjs "$PAGE_URL"
+        timeout-minutes: 5
