@@ -5,7 +5,10 @@
         matters for old single-byte files; leave it on Auto unless the lyrics come
         out as mojibake.
     </p>
-    <select class="select" @bind="AnsiChoice">
+    @* Deliberately not @bind: an element binding only writes the value back into
+       this component's own property and never raises AnsiChoiceChanged, so the
+       page would sit on the old conversion until some other input arrived. *@
+    <select class="select" value="@AnsiChoice.ToString()" @onchange="OnSelectionChanged">
         @for (var i = 0; i < AnsiEncodingChoices.All.Length; i++)
         {
             <option value="@i">@AnsiEncodingChoices.All[i].Label</option>
@@ -19,4 +22,14 @@
 
     [Parameter]
     public EventCallback<int> AnsiChoiceChanged { get; set; }
+
+    private Task OnSelectionChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value as string, out var index))
+        {
+            AnsiChoice = index;
+        }
+
+        return AnsiChoiceChanged.InvokeAsync(AnsiChoice);
+    }
 }
