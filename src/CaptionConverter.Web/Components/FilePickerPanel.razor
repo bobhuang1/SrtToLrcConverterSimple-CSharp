@@ -1,0 +1,30 @@
+<section class="panel">
+    <h2>1 &mdash; Pick a subtitle file</h2>
+    <div class="dropzone">
+        <InputFile OnChange="OnFileSelected"
+                   accept=".srt,.vtt,.ass,.ssa,.smi,.sub,.mpl2,.pjs,.ttml,.dfxp" />
+        <p class="hint">or try a bundled sample:</p>
+        <div class="samples">
+            @foreach (var sample in DemoSamples.All)
+            {
+                <button type="button"
+                        class="btn btn-ghost"
+                        @onclick="() => OnPickSample.InvokeAsync(sample.Name)"
+                        disabled="@Disabled">@sample.Label</button>
+            }
+        </div>
+    </div>
+</section>
+
+@code {
+    private Task OnFileSelected(InputFileChangeEventArgs args) => OnPickFile.InvokeAsync(args);
+
+    [Parameter, EditorRequired]
+    public EventCallback<InputFileChangeEventArgs> OnPickFile { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<string> OnPickSample { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+}

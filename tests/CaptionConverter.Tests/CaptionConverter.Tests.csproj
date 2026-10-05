@@ -20,6 +20,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\CaptionConverter.Core\CaptionConverter.Core.csproj" />
+    <!-- For the browser demo's conversion plumbing (SubtitleSession and friends),
+         which is plain C# and needs no WebAssembly runtime to exercise. -->
+    <ProjectReference Include="..\..\src\CaptionConverter.Web\CaptionConverter.Web.csproj" />
   </ItemGroup>
 
 </Project>
