@@ -203,8 +203,11 @@ public class LrcRenderTests
     {
         var lrc = _converter.Parse(SrtSample);
 
+        // The renderer joins cues with Environment.NewLine, so the expected text
+        // has to follow the host platform rather than assume Windows line endings.
+        var nl = Environment.NewLine;
         Assert.Equal(
-            "[00:01.00]Hello world\r\n[01:00.00]Minute marker\r\n\r\n",
+            "[00:01.00]Hello world" + nl + "[01:00.00]Minute marker" + nl + nl,
             lrc.Text);
     }
 
@@ -214,7 +217,7 @@ public class LrcRenderTests
         const string vtt = "WEBVTT\n\n00:01.500 --> 00:04.000\nHello";
         var lrc = _converter.Parse(vtt);
 
-        Assert.Equal("[00:01.50]Hello\r\n\r\n", lrc.Text);
+        Assert.Equal("[00:01.50]Hello" + Environment.NewLine + Environment.NewLine, lrc.Text);
     }
 }
 
