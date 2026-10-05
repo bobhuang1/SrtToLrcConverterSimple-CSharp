@@ -27,7 +27,9 @@ jobs:
       # Gate the deploy on the conversion core tests, so a parser regression
       # cannot reach the published site.
       - name: Test
-        run: dotnet test CaptionConverter.sln -c Release
+        # Target the test project rather than the solution: CaptionConverter.Ui
+        # targets net10.0-windows and cannot build on the Linux runner.
+        run: dotnet test tests/CaptionConverter.Tests/CaptionConverter.Tests.csproj -c Release
 
       - name: Publish Blazor WebAssembly
         run: dotnet publish src/CaptionConverter.Web/CaptionConverter.Web.csproj -c Release -o publish
