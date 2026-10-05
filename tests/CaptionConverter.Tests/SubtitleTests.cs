@@ -217,7 +217,7 @@ public class LrcRenderTests
         const string vtt = "WEBVTT\n\n00:01.500 --> 00:04.000\nHello";
         var lrc = _converter.Parse(vtt);
 
-        Assert.Equal("[00:01.50]Hello" + Environment.NewLine + Environment.NewLine, lrc.Text);
+        Assert.Equal("[00:01.50]Hello\r\n\r\n", lrc.Text);
     }
 }
 
