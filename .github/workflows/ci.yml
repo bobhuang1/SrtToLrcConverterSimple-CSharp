@@ -1,0 +1,42 @@
+name: CI
+
+# The Pages deploy already runs the tests, but only after a merge to master.
+# That is too late: a change that passes on a Windows dev box can still break
+# the ubuntu-latest deploy (and vice versa). This runs on every pull request.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Both platforms on purpose. The conversion tests assert on rendered text,
+    # so a platform-specific assumption (line endings, path separators, ANSI
+    # code page) passes on one OS and fails on the other.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Build the project that actually gets deployed, so a Razor or WASM
+      # compile error is caught here rather than during the Pages deploy.
+      - name: Build web demo
+        run: dotnet build src/CaptionConverter.Web/CaptionConverter.Web.csproj -c Release
+
+      - name: Test
+        # The test project rather than the solution: CaptionConverter.Ui targets
+        # net10.0-windows and cannot build on the Linux runner.
+        run: dotnet test tests/CaptionConverter.Tests/CaptionConverter.Tests.csproj -c Release
