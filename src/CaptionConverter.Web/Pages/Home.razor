@@ -1,5 +1,4 @@
 @page "/"
-@using System.Text
 @implements IAsyncDisposable
 @inject SubtitleConverter Converter
 @inject IJSRuntime JS
@@ -16,34 +15,11 @@
     app and the CLI use, compiled to WebAssembly. Nothing is uploaded.
 </p>
 
-<section class="panel">
-    <h2>1 &mdash; Pick a subtitle file</h2>
-    <div class="dropzone">
-        <InputFile OnChange="OnFileSelected"
-                   accept=".srt,.vtt,.ass,.ssa,.smi,.sub,.mpl2,.pjs,.ttml,.dfxp" />
-        <p class="hint">or try a bundled sample:</p>
-        <div class="samples">
-            <button type="button" class="btn btn-ghost" @onclick="LoadSrtAsync" disabled="@_busy">SubRip (.srt)</button>
-            <button type="button" class="btn btn-ghost" @onclick="LoadVttAsync" disabled="@_busy">WebVTT (.vtt)</button>
-            <button type="button" class="btn btn-ghost" @onclick="LoadAssAsync" disabled="@_busy">SubStation (.ass)</button>
-        </div>
-    </div>
-</section>
+<FilePickerPanel Disabled="_busy"
+                 OnPickFile="OnFileSelectedAsync"
+                 OnPickSample="LoadSampleAsync" />
 
-<section class="panel">
-    <h2>2 &mdash; Legacy text encoding</h2>
-    <p class="hint">
-        Input is sniffed as BOM, then strict UTF-8, then this fallback. It only
-        matters for old single-byte files; leave it on Auto unless the lyrics come
-        out as mojibake.
-    </p>
-    <select class="select" @bind="_ansiChoice" @bind:after="OnAnsiChanged">
-        @for (var i = 0; i < AnsiChoices.Length; i++)
-        {
-            <option value="@i">@AnsiChoices[i].Label</option>
-        }
-    </select>
-</section>
+<EncodingPanel @bind-AnsiChoice="Session.AnsiChoice" />
 
 @if (_busy)
 {
@@ -55,38 +31,16 @@
     <p class="status status-error">@_error</p>
 }
 
-@if (_lrc is not null)
+@if (Session.Lrc is not null)
 {
-    <section class="panel">
-        <h2>3 &mdash; Result</h2>
-        <div class="badges">
-            <span class="badge badge-format">@_format</span>
-            <span class="badge">@_cueCount cue(s)</span>
-            @if (_warnings.Count > 0)
-            {
-                <span class="badge badge-warn">@_warnings.Count warning(s)</span>
-            }
-        </div>
-
-        <pre class="lrc">@_lrc</pre>
-
-        <button type="button" class="btn btn-primary" @onclick="DownloadAsync">
-            Download @_suggestedName
-        </button>
-
-        @if (_warnings.Count > 0)
-        {
-            <details class="warnings">
-                <summary>Parser warnings</summary>
-                <ul>
-                    @foreach (var warning in _warnings)
-                    {
-                        <li><span class="seq">#@warning.Sequence</span> @warning.Message</li>
-                    }
-                </ul>
-            </details>
-        }
-    </section>
+    @* The @ matters on the two string parameters: without it Razor passes the
+       text "Session.Lrc" as a literal instead of the value. *@
+    <ResultPanel Lrc="@Session.Lrc"
+                 SuggestedName="@Session.SuggestedName"
+                 Warnings="Session.Warnings"
+                 Format="Session.Format"
+                 CueCount="Session.CueCount"
+                 OnDownload="DownloadAsync" />
 }
 
 @code {
@@ -94,54 +48,16 @@
     // mistaken multi-gigabyte drop from exhausting browser memory.
     private const long MaxFileBytes = 32L * 1024 * 1024;
 
-    private static readonly (string Label, string? CodePage)[] AnsiChoices =
-    [
-        ("Auto (BOM, then strict UTF-8)", null),
-        ("Windows-1252 - Western European", "windows-1252"),
-        ("GB18030 - Simplified Chinese", "gb18030"),
-        ("Big5 - Traditional Chinese", "big5"),
-        ("Shift-JIS - Japanese", "shift_jis"),
-        ("EUC-KR - Korean", "euc-kr"),
-    ];
+    // The conversion itself lives in SubtitleSession; this page owns only the
+    // browser side of it: reading files, fetching samples and downloading.
+    private SubtitleSession? _session;
+    private SubtitleSession Session => _session ??= new SubtitleSession(Converter);
 
-    private readonly LrcConversionOptions _options = new();
-
-    private byte[]? _sourceBytes;
-    private string? _sourceName;
-    private string? _lrc;
-    private string? _suggestedName;
-    private IReadOnlyList<SrtWarning> _warnings = Array.Empty<SrtWarning>();
-    private SubtitleFormatKind _format;
-    private int _ansiChoice;
-    private int _cueCount;
     private bool _busy;
     private string? _error;
     private IJSObjectReference? _downloadModule;
 
-    private Encoding? AnsiEncoding
-    {
-        get
-        {
-            var codePage = AnsiChoices[_ansiChoice].CodePage;
-            if (codePage is null)
-            {
-                return null;
-            }
-
-            try
-            {
-                return Encoding.GetEncoding(codePage);
-            }
-            catch (Exception)
-            {
-                // This runtime has no codepage tables; the converter then falls
-                // back to Encoding.Default.
-                return null;
-            }
-        }
-    }
-
-    private async Task OnFileSelected(InputFileChangeEventArgs args)
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs args)
     {
         var file = args.File;
         if (file.Size > MaxFileBytes)
@@ -157,12 +73,32 @@
             await using var stream = file.OpenReadStream(MaxFileBytes);
             using var buffer = new MemoryStream();
             await stream.CopyToAsync(buffer);
-            Load(file.Name, buffer.ToArray());
+            Session.Load(file.Name, buffer.ToArray());
         }
         catch (Exception ex)
         {
             _error = "Could not read that file: " + ex.Message;
-            _lrc = null;
+            Session.Clear();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task LoadSampleAsync(string name)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var bytes = await Http.GetByteArrayAsync("samples/" + name);
+            Session.Load(name, bytes);
+        }
+        catch (Exception ex)
+        {
+            _error = "Could not load the sample: " + ex.Message;
+            Session.Clear();
         }
         finally
         {
@@ -172,8 +108,6 @@
 
     // ?sample=demo.srt makes a converted result directly linkable, which is
     // also how the README screenshot is produced.
-    private static readonly string[] SampleNames = ["demo.srt", "demo.vtt", "demo.ass"];
-
     protected override async Task OnInitializedAsync()
     {
         var name = SampleFromUri();
@@ -197,7 +131,7 @@
             var kv = pair.Split("=", 2);
             // Only the bundled samples are accepted, so the query string can
             // never be used to fetch an arbitrary path.
-            if (kv.Length == 2 && kv[0] == "sample" && SampleNames.Contains(kv[1]))
+            if (kv.Length == 2 && kv[0] == "sample" && DemoSamples.IsBundled(kv[1]))
             {
                 return kv[1];
             }
@@ -206,70 +140,15 @@
         return null;
     }
 
-    private Task LoadSrtAsync() => LoadSampleAsync("demo.srt");
-    private Task LoadVttAsync() => LoadSampleAsync("demo.vtt");
-    private Task LoadAssAsync() => LoadSampleAsync("demo.ass");
-
-    private async Task LoadSampleAsync(string name)
-    {
-        _busy = true;
-        _error = null;
-        try
-        {
-            var bytes = await Http.GetByteArrayAsync("samples/" + name);
-            Load(name, bytes);
-        }
-        catch (Exception ex)
-        {
-            _error = "Could not load the sample: " + ex.Message;
-            _lrc = null;
-        }
-        finally
-        {
-            _busy = false;
-        }
-    }
-
-    private void OnAnsiChanged()
-    {
-        if (_sourceBytes is not null && _sourceName is not null)
-        {
-            Load(_sourceName, _sourceBytes);
-        }
-    }
-
-    private void Load(string name, byte[] bytes)
-    {
-        _sourceBytes = bytes;
-        _sourceName = name;
-        _options.AnsiEncoding = AnsiEncoding;
-
-        var text = bytes.Length == 0
-            ? string.Empty
-            : SubtitleTextDecoder.Decode(bytes, _options.AnsiEncoding);
-
-        // Parse() detects from content only, so report the same format it used
-        // rather than letting the filename influence the badge.
-        _format = SubtitleFormat.Detect(string.Empty, text);
-
-        var result = Converter.Parse(text);
-        _lrc = result.Text;
-        _warnings = result.Warnings;
-        _cueCount = result.Text
-            .Split((char)10)
-            .Count(line => line.StartsWith("[", StringComparison.Ordinal));
-        _suggestedName = Path.GetFileName(Converter.GetOutputPath(name, _options));
-    }
-
     private async Task DownloadAsync()
     {
-        if (_lrc is null || _suggestedName is null)
+        if (Session.Lrc is not { } lrc || Session.SuggestedName is not { } suggestedName)
         {
             return;
         }
 
         _downloadModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/captionconverter.js");
-        await _downloadModule.InvokeVoidAsync("downloadText", _suggestedName, _lrc);
+        await _downloadModule.InvokeVoidAsync("downloadText", suggestedName, lrc);
     }
 
     public async ValueTask DisposeAsync()
@@ -280,4 +159,3 @@
         }
     }
 }
-

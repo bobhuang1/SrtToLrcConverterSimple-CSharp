@@ -1,0 +1,50 @@
+<section class="panel">
+    <h2>3 &mdash; Result</h2>
+    <div class="badges">
+        <span class="badge badge-format">@Format</span>
+        <span class="badge">@CueCount cue(s)</span>
+        @if (Warnings.Count > 0)
+        {
+            <span class="badge badge-warn">@Warnings.Count warning(s)</span>
+        }
+    </div>
+
+    <pre class="lrc">@Lrc</pre>
+
+    <button type="button" class="btn btn-primary" @onclick="OnDownload">
+        Download @SuggestedName
+    </button>
+
+    @if (Warnings.Count > 0)
+    {
+        <details class="warnings">
+            <summary>Parser warnings</summary>
+            <ul>
+                @foreach (var warning in Warnings)
+                {
+                    <li><span class="seq">#@warning.Sequence</span> @warning.Message</li>
+                }
+            </ul>
+        </details>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Lrc { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string SuggestedName { get; set; } = string.Empty;
+
+    [Parameter]
+    public IReadOnlyList<SrtWarning> Warnings { get; set; } = Array.Empty<SrtWarning>();
+
+    [Parameter]
+    public SubtitleFormatKind Format { get; set; }
+
+    [Parameter]
+    public int CueCount { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnDownload { get; set; }
+}

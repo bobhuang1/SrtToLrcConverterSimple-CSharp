@@ -1,0 +1,22 @@
+<section class="panel">
+    <h2>2 &mdash; Legacy text encoding</h2>
+    <p class="hint">
+        Input is sniffed as BOM, then strict UTF-8, then this fallback. It only
+        matters for old single-byte files; leave it on Auto unless the lyrics come
+        out as mojibake.
+    </p>
+    <select class="select" @bind="AnsiChoice">
+        @for (var i = 0; i < AnsiEncodingChoices.All.Length; i++)
+        {
+            <option value="@i">@AnsiEncodingChoices.All[i].Label</option>
+        }
+    </select>
+</section>
+
+@code {
+    [Parameter]
+    public int AnsiChoice { get; set; }
+
+    [Parameter]
+    public EventCallback<int> AnsiChoiceChanged { get; set; }
+}
