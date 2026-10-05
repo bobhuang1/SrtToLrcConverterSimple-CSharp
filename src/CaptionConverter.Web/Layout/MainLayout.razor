@@ -1,0 +1,22 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <header class="top-bar">
+        <div class="top-bar-inner">
+            <span class="brand">CaptionConverter</span>
+            <span class="brand-sub">subtitle to LRC, in your browser</span>
+            <a class="top-link" href="https://github.com/bobhuang1/SrtToLrcConverterSimple-CSharp"
+               target="_blank" rel="noopener">Source on GitHub</a>
+        </div>
+    </header>
+
+    <main class="content">
+        @Body
+    </main>
+
+    <footer class="footer">
+        Runs entirely in your browser &mdash; the same <code>CaptionConverter.Core</code>
+        C# used by the WPF app and the CLI, compiled to WebAssembly. Files never
+        leave this page.
+    </footer>
+</div>

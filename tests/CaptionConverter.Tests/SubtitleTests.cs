@@ -355,3 +355,46 @@ internal sealed class CultureScope : IDisposable
 
     public void Dispose() => System.Globalization.CultureInfo.CurrentCulture = _previous;
 }
+public class AnsiEncodingOverrideTests
+{
+    [Fact]
+    public void Decode_UsesExplicitAnsiEncodingInsteadOfTheCultureDefault()
+    {
+        // "Caf" + e-acute in Latin-1. The lone 0xE9 byte is not valid UTF-8,
+        // so decoding always reaches the ANSI fallback. Passing the codepage
+        // explicitly makes the outcome independent of the machine culture,
+        // which is what the browser host needs: WebAssembly has no real
+        // system code page to infer.
+        var bytes = Encoding.Latin1.GetBytes("Caf" + (char)233);
+
+        Assert.Equal("Caf" + (char)233, SubtitleTextDecoder.Decode(bytes, Encoding.Latin1));
+    }
+
+    [Fact]
+    public void ConvertFile_HonoursExplicitAnsiEncoding()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "SrtToLrcTests_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var path = Path.Combine(tempDir, "latin.srt");
+            var text = "Caf" + (char)233;
+            File.WriteAllBytes(path, Encoding.Latin1.GetBytes("1\n00:00:01,000 --> 00:00:04,000\n" + text + "\n"));
+
+            var converter = new SrtToLrcConverter.SrtToLrcConverter();
+            var result = converter.ConvertFile(path, new LrcConversionOptions
+            {
+                OutputDirectory = tempDir,
+                AnsiEncoding = Encoding.Latin1,
+            });
+
+            Assert.True(result.Converted);
+            Assert.Contains(text, result.Lrc!.Text);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+}
+

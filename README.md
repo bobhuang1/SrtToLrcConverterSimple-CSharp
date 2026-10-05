@@ -1,9 +1,28 @@
 # CaptionConverter
 
 Converts caption/subtitle files into `.lrc` synchronized-lyrics files — the
-format most music players use for scrolling lyrics. Available as both a
-**WPF desktop app** and a **command-line tool**, sharing the same conversion
-core.
+format most music players use for scrolling lyrics. Available as a
+**Blazor WebAssembly web app**, a **WPF desktop app**, and a **command-line
+tool**, all sharing the same conversion core.
+
+## Try it in your browser
+
+**[Open the live demo](https://bobhuang1.github.io/SrtToLrcConverterSimple-CSharp/)**
+
+![The web demo converting a bundled .srt sample to LRC](docs/web-demo.png)
+
+<sub>Loading `?sample=demo.srt`, `?sample=demo.vtt`, or `?sample=demo.ass` converts
+that sample on open, so a particular result can be linked directly.</sub>
+
+`CaptionConverter.Web` is a Blazor WebAssembly app that runs the *same*
+`CaptionConverter.Core` C# the WPF app and the CLI use, compiled to WebAssembly.
+Drop in a subtitle file (or click one of the bundled samples) and download the
+generated `.lrc`. There is no server and nothing is uploaded — the file never
+leaves the browser tab.
+
+It drives the real parsers, so it is an honest preview of what the desktop app
+does: content-based format detection, HTML and SSA/ASS tag stripping, per-file
+parser warnings, and the BOM → strict-UTF-8 → ANSI decoding ladder.
 
 ## Features
 
@@ -40,6 +59,8 @@ CaptionConverter.sln
 │   │                                   content/encoding auto-detection, LRC
 │   │                                   rendering & naming options
 │   ├── CaptionConverter.Cli    console app — batch-converts a folder
+│   ├── CaptionConverter.Web   Blazor WebAssembly demo deployed to GitHub
+│   │                                Pages — runs the same core in the browser
 │   └── CaptionConverter.Ui     WPF desktop app — folder/file picker,
 │                                       options, results list, LRC preview
 └── tests/
@@ -53,7 +74,24 @@ All projects target **.NET 10** and are referenced from
 ## Prerequisites
 
 - .NET 10 SDK (`dotnet --list-sdks` should include `10.0.x`). Windows is
-  required for the WPF UI; the CLI and Core work cross-platform.
+  required for the WPF UI; the CLI, Core, and Web app work cross-platform.
+
+## Web app (local development)
+
+The demo is a standard Blazor WebAssembly app — run it with the usual dev
+server:
+
+```
+dotnet run --project src/CaptionConverter.Web
+```
+
+The hosted version is published to GitHub Pages by
+`.github/workflows/deploy.yml`, which runs the test suite first and then
+publishes `src/CaptionConverter.Web` as a static site.
+
+`tools/set-base-href.mjs` is what adapts the published output for Pages: a
+project site is served from `/<repo>/`, so the app's `<base href>` has to
+match that prefix or every asset URL resolves from the domain root and 404s.
 
 ## WPF UI
 
